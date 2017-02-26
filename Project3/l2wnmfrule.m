@@ -1,11 +1,12 @@
-function [A,Y,numIter,tElapsed,finalResidual]=wnmfrule(X,k,option)
+function [A,Y,numIter,tElapsed,finalResidual]=l2wnmfrule(X,k,lambda,option)
 % Weighted NMF based on multiple update rules for missing values: X=AY, s.t. A,Y>=0.
 % Definition:
-%     [A,Y,numIter,tElapsed,finalResidual]=wnmfrule(X,k)
-%     [A,Y,numIter,tElapsed,finalResidual]=wnmfrule(X,k,option)
+%     [A,Y,numIter,tElapsed,finalResidual]=l2wnmfrule(X,k,lambda)
+%     [A,Y,numIter,tElapsed,finalResidual]=l2wnmfrule(X,k,lambda,option)
 % X: non-negative matrix, dataset to factorize, each column is a sample,
 % and each row is a feature. A missing value is represented by NaN.
 % k: number of clusters.
+% lambda: regularization parameter.
 % option: struct:
 % option.distance: distance used in the objective function. It could be
 %    'ls': the Euclidean distance (defalut),
@@ -25,7 +26,10 @@ function [A,Y,numIter,tElapsed,finalResidual]=wnmfrule(X,k,option)
 %%%
 % modified by Yi Zheng for EE219 Project 3, Winter 2017
 % from wnmfrule.m in The NMF MATLAB Toolbox by Yifeng Li
-% 
+% add lambda: l2 regularization parameter (Default: 0)
+% switch X with W for modification
+% add l2 regularization
+% https://github.com/zhengyipiz/EE219/
 %%%%
 % Copyright (C) <2012>  <Yifeng Li>
 % 
@@ -56,17 +60,22 @@ optionDefault.iter=1000;
 optionDefault.dis=true;
 optionDefault.residual=1e-4;
 optionDefault.tof=1e-4;
-optionDefault.lambda=0;
-if nargin<3
+
+if nargin<4
    option=optionDefault;
 else
-    option=mergeOption(option,optionDefault);
+   option=mergeOption(option,optionDefault);
 end
 
 % Weight
 W=isnan(X);
 X(W)=0;
 W=~W;
+
+% Switch X with W
+Tmp=X;
+X=W;
+W=Tmp;
 
 % iter: number of iterations
 [r,c]=size(X); % c is # of samples, r is # of features
@@ -80,10 +89,11 @@ XfitPrevious=Inf;
 for i=1:option.iter
     switch option.distance
         case 'ls'
-            A=A.*(((W.*X)*Y')./((W.*(A*Y))*Y'));
+%           add lambda term for regularization
+            A=A.*(((W.*X)*Y')./((W.*(A*Y))*Y'+lambda*A));
 %             A(A<eps)=0;
                 A=max(A,eps);
-            Y=Y.*((A'*(W.*X))./(A'*(W.*(A*Y))));
+            Y=Y.*((A'*(W.*X))./(A'*(W.*(A*Y))+lambda*Y));
 %             Y(Y<eps)=0;
                 Y=max(Y,eps);
         case 'kl'
